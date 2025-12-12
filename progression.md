@@ -1,0 +1,66 @@
+# progression.md — Build Log for My Virtual Machine
+
+## Day 0: Setup and Goals
+### Why I'm building a VM: 
+Because... Why Not? 😄 
+But on a serious note, the project I built before this was a fully-functioning shell, and that really got me hooked to systems. The next logical step is building a Virtual Machine.
+And more importantly, because I just really love building stuff.
+### What features I want:
+I plan to be as masochistic as possible, so short answer: All of them.
+Long answer:
+
+#### Phase 1 — Core VM (The Skeleton)
+- A bytecode format (my VM’s own language, because why follow instructions?)
+- Instruction dispatch loop (aka "the VM hamster wheel")
+- A stack machine (push, pop, pray)
+- Arithmetic ops (+, -, *, / — but without floating point meltdowns)
+- Control flow: jumps, conditionals, loops
+
+#### Phase 2 — Memory Model (Where objects go to live & occasionally die)
+- Heap allocator
+- Fixed layout for objects (integers, strings, arrays, etc.)
+- Frames & call stack
+- GC roots and tracing prep
+
+#### Phase 3 — Garbage Collector (The Grim Reaper)
+- Mark & Sweep (basic)
+- Correct root finding (global vars, stack frames)
+- No accidental deletion of living objects (hopefully)
+- No memory leaks when GC forgets to sweep (hopefully again)
+
+#### Phase 4 — Parser + Compiler (The VM learns to read)
+- Tokenizer
+- AST builder
+- Compiler -> bytecode
+- Functions, variables, local scopes
+- Error messages that don’t gaslight users
+
+#### Phase 5 — High-Level Language Features (The spice)
+I'll add this as I want:
+
+##### Option A — Performance Flex
+- Bytecode optimizer
+- Simple JIT (compile hot loops)
+- Benchmark suite (compare with Lua/CPython)
+- VM potentially gets faster than I do
+
+##### Option B — Developer Experience (the “this is actually fun to code in” route)
+- Debugger (step, breakpoints, inspect stack/heap)
+- Error messages with line numbers & context
+- REPL with syntax highlighting
+
+##### Option C — Language Nerd Heaven (PL theory street cred)
+- Closures with lexical scoping
+- First-class functions
+- Tail call optimization
+- Theoretical bragging rights
+
+### Languages/tools I'm using:
+-C++
+-VS Code
+-Caffeine.
+### What scares me/excites me:
+Whatever scares me also excites me. 😈
+### What I expect to learn:
+Systems chops!
+Also, how to function at 3 AM solely on caffeine fumes.
