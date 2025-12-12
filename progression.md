@@ -1,4 +1,5 @@
 # progression.md — Build Log for My Virtual Machine
+## This file is basically the VM’s diary. If something breaks, cries (me), explodes, or achieves sentience — it’s going in here.
 
 ## Day 0: Setup and Goals
 ### Why I'm building a VM: 
