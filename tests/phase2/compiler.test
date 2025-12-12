@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Check if compiler exists
+if [ ! -f "./compiler" ]; then
+    skip_test "Compiler not yet implemented"
+    return
+fi
+
+# Test 1: Simple print
+test_start "Compile: print(42)"
+cat > /tmp/vm-prog1.txt << 'EOF'
+print(42);
+EOF
+compile_and_run /tmp/vm-prog1.txt
+assert_contains "42"
+
+# Test 2: Arithmetic expression
+test_start "Compile: print(1 + 2 * 3)"
+cat > /tmp/vm-prog2.txt << 'EOF'
+print(1 + 2 * 3);
+EOF
+compile_and_run /tmp/vm-prog2.txt
+assert_contains "7"
+
+# Test 3: Multiple statements
+test_start "Compile: Multiple print statements"
+cat > /tmp/vm-prog3.txt << 'EOF'
+print(10);
+print(20);
+print(30);
+EOF
+compile_and_run /tmp/vm-prog3.txt
+assert_contains "10"
+assert_contains "20"
+assert_contains "30"

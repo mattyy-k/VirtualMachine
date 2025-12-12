@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Test 1: PUSH and PRINT
+test_start "PUSH constant and PRINT"
+cat > /tmp/vm-push-print.bc << 'EOF'
+PUSH 42
+PRINT
+HALT
+EOF
+run_vm /tmp/vm-push-print.bc
+assert_contains "42"
+assert_exit_success
+
+# Test 2: Simple addition
+test_start "ADD two numbers"
+cat > /tmp/vm-add.bc << 'EOF'
+PUSH 2
+PUSH 3
+ADD
+PRINT
+HALT
+EOF
+run_vm /tmp/vm-add.bc
+assert_contains "5"
+
+# Test 3: Subtraction
+test_start "SUB two numbers"
+cat > /tmp/vm-sub.bc << 'EOF'
+PUSH 10
+PUSH 3
+SUB
+PRINT
+HALT
+EOF
+run_vm /tmp/vm-sub.bc
+assert_contains "7"
+
+# Test 4: Multiplication
+test_start "MUL two numbers"
+cat > /tmp/vm-mul.bc << 'EOF'
+PUSH 4
+PUSH 5
+MUL
+PRINT
+HALT
+EOF
+run_vm /tmp/vm-mul.bc
+assert_contains "20"
+
+# Test 5: Division
+test_start "DIV two numbers"
+cat > /tmp/vm-div.bc << 'EOF'
+PUSH 20
+PUSH 4
+DIV
+PRINT
+HALT
+EOF
+run_vm /tmp/vm-div.bc
+assert_contains "5"
+
+# Test 6: Complex expression
+test_start "Complex arithmetic: (2 + 3) * 4"
+cat > /tmp/vm-complex.bc << 'EOF'
+PUSH 2
+PUSH 3
+ADD
+PUSH 4
+MUL
+PRINT
+HALT
+EOF
+run_vm /tmp/vm-complex.bc
+assert_contains "20"
+
+# Test 7: Stack underflow
+test_start "Stack underflow error"
+cat > /tmp/vm-underflow.bc << 'EOF'
+ADD
+HALT
+EOF
+run_vm /tmp/vm-underflow.bc
+assert_exit_error

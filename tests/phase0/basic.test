@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Test 1: VM exists and runs
+test_start "VM binary exists"
+if [ -f "./vm" ]; then
+    echo -e "${GREEN}✓${NC} VM binary found"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}✗${NC} VM binary not found"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
+# Test 2: HALT instruction (program exits cleanly)
+test_start "HALT instruction - program exits cleanly"
+cat > /tmp/vm-halt.bc << 'EOF'
+HALT
+EOF
+run_vm /tmp/vm-halt.bc
+assert_exit_success
+assert_no_output
+
+# Test 3: Invalid bytecode handling
+test_start "Invalid bytecode - graceful error"
+cat > /tmp/vm-invalid.bc << 'EOF'
+INVALID_INSTRUCTION
+EOF
+run_vm /tmp/vm-invalid.bc
+assert_exit_error
