@@ -68,6 +68,7 @@ Also, how to function at 3 AM solely on caffeine fumes.
 
 ### Phase 0 (16/12/2025):
 -Stack-based VM and not Register-based. Reason: fast enough, and much simpler to implement.
+
 -Execution model:
   -The VM is a state machine whose state consists of the instruction pointer, operand stack and heap.
   -Instruction Pointer
@@ -75,10 +76,12 @@ Also, how to function at 3 AM solely on caffeine fumes.
   -Instruction Dispatch:
     -The first byte read is the opcode
     -The VM uses a giant switch statement to decode or dispatch the instruction.
+    
 -Value Model:
   -Dynamic typing
   -Value Type: single Value type with Tagged Union semantics.
   -Optimizations will not be implemented at this stage. Instead, I will design clean abstractions that allow future optimization.
+  
 -Memory Model:
   -Primitive values on the Vm stack; heap objects are referenced via pointers stored in Values.
 -Non-goals: No GC, closures, JIT, threads, native FFI, Optimizer, Exceptions, YET. Will be implemented in later phases.
