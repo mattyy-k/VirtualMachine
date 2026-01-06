@@ -14,105 +14,105 @@ The project is currently in the design phase; implementation will begin after va
 
 ## Design Goals
 
-### Build a clear, minimal, and extensible virtual machine
+Build a clear, minimal, and extensible virtual machine
 
-### Prioritize correctness and clarity over premature optimization
+Prioritize correctness and clarity over premature optimization
 
-### Design abstractions that allow future extensions (GC, closures, JIT)
+Design abstractions that allow future extensions (GC, closures, JIT)
 
 ## VM Architecture
 
-## Execution Model
+### Execution Model
 
-### Stack-based virtual machine
+Stack-based virtual machine
 
-### Instruction Pointer (IP)
+Instruction Pointer (IP)
 
-### Operand stack
+Operand stack
 
-### Heap for dynamically allocated objects
+Heap for dynamically allocated objects
 
-### Central dispatch loop using opcode-based instruction decoding
+Central dispatch loop using opcode-based instruction decoding
 
-### Instruction Dispatch
+Instruction Dispatch
 
-### Bytecode instruction stream
+Bytecode instruction stream
 
-### First byte represents opcode
+First byte represents opcode
 
-### Dispatch implemented via a switch-based loop
+Dispatch implemented via a switch-based loop
 
 ## Value Model
 
-### Dynamically typed
+Dynamically typed
 
-### Single Value type using tagged-union semantics
+Single Value type using tagged-union semantics
 
-### Supports primitive values and references to heap-allocated objects
+Supports primitive values and references to heap-allocated objects
 
 ## Memory Model
 
-### Primitive values stored directly on the VM stack
+Primitive values stored directly on the VM stack
 
-### Heap-allocated objects referenced via pointers in Value
+Heap-allocated objects referenced via pointers in Value
 
-### No garbage collection in initial phase (planned to be implemented later)
+No garbage collection in initial phase (planned to be implemented later)
 
 ## Planned Phases
 
-## Phase 1 — Core VM
+### Phase 1 — Core VM
 
-### Bytecode format
+Bytecode format
 
-### Instruction dispatch
+Instruction dispatch
 
-### Arithmetic and control flow
+Arithmetic and control flow
 
-## Phase 2 — Memory & Call Stack
+### Phase 2 — Memory & Call Stack
 
-### Heap allocator
+Heap allocator
 
-### Stack frames and function calls
+Stack frames and function calls
 
-## Phase 3 — Garbage Collection
+### Phase 3 — Garbage Collection
 
-### Mark-and-sweep collector
+Mark-and-sweep collector
 
-### Root tracking
+Root tracking
 
-## Phase 4 — Parser & Compiler
+### Phase 4 — Parser & Compiler
 
-### Tokenizer
+Tokenizer
 
-### AST
+AST
 
-### Bytecode compiler
+Bytecode compiler
 
-## Phase 5 — Advanced Features
+### Phase 5 — Advanced Features
 
-### Optimizations / JIT OR
+Optimizations / JIT OR
 
-### Debugger & REPL OR
+Debugger & REPL OR
 
-### Closures and TCO
+Closures and TCO
 
-## Non-Goals (Initial Phases)
+### Non-Goals (Initial Phases)
 
-### Garbage collection
+Garbage collection
 
-### Closures
+Closures
 
-### JIT compilation
+JIT compilation
 
-### Native FFI
+Native FFI
 
-### Multithreading
+Multithreading
 
-## Status
+### Status
 
-### Phase 0 (Architecture & Design): Complete
+Phase 0 (Architecture & Design): Complete
 
-### Phase 1 (Implementation): Upcoming
+Phase 1 (Implementation): Upcoming
 
 If you’re interested in the day-to-day progress — design decisions, debugging disasters, breakthroughs, and lessons learned — check out the **progression.md** file.  
 I’ll be treating it like a build log / dev diary for this project.
