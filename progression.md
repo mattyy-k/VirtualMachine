@@ -86,3 +86,12 @@ Also, how to function at 3 AM solely on caffeine fumes.
   -Primitive values on the Vm stack; heap objects are referenced via pointers stored in Values.
 -Non-goals: No GC, closures, JIT, threads, native FFI, Optimizer, Exceptions, YET. Will be implemented in later phases.
   
+### Phase 1 (10/01/2026):
+-Enum class Opcode for all opcodes: PUSH, POP, ADD, SUB, MUL, DIV, MOD, HALT. Why enum class and not enum? Because enum allows a lot of shady, implicit shit, and allowing implicit shit in your VM is the best way to shoot yourself in the foot. (For those who are curious about what I mean by 'shady shit': I mean implicit conversions and accidental misuse, which is dangerous in a VM, where explicitness and correctness are critical)
+
+-Stack invariant followed as religiously as my daily call to my mom. :)
+
+-The thing I had to figure out without which I could not have written a single line of code: The VM is a dumb little shit 🙄. It does not (and rightly so) care about anything except the bytecode it's fed, and how to execute said bytecode in the most efficient manner possible.
+
+-One bug I encountered that threw probably one of the longest error messages I've ever seen 💀: switch cases DO NOT create a new scope per case; the entire switch statement is one scope. If you don't care about what that means, just follow this: if you're declaring anything in your switch case, the switch case MUST be wrapped in {} brackets, especially if you're going to re-declare it in another case.
+Another bug that had me blaming the compiler for a while was enum casting. And guess what? It was due to my decision to be the good guy and pick enum class over enum. It would not have occured, had I gone with enum instead of enum class (because implicit conversion). :/ Can't get a break in this economy 🙄
