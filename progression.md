@@ -107,3 +107,14 @@ Another bug that had me blaming the compiler for a while was enum casting. And g
 -Return values are handled explicitly: if the callee leaves a value on the stack, RET preserves it by popping it, cleaning the stack, and pushing it back. This also explains why stack cleanup is O(1): you’re not deleting values, you’re just rewinding the stack pointer.
 
 -This phase went much smoother than Phase 1. That does NOT bode well 💀. Feels like the calm before the shitstorm.
+
+### Phase 3 (12/01/2026):
+Well... I wasn't wrong. That kinda was a shitstorm.
+
+-Stack vs heap clicked pretty early: stack is only for handles to objects, while heap is for objects.
+
+-The Value abstraction was pretty neat. A tagged union. This also incidentally happened to be the main phase shift my stubborn brain couldn't internalize: operand stack values are not integers anymore, they're struct Values, able to store any primitive data type and also references to heap objects. Arrays forced me to stop assuming that everything was an int and finally treat Value as a first-class runtime entity.
+
+-Ran into a couple of segfaults that had me screaming inside in the library (don't do this shit for more than 5 hours a day, kids 🙄). But segfaults were just undefined behaviour surfacing after invariants were violated. Can't even blame anything but my own saturated brain 😶‍🌫️.
+
+-I think this was the point I started feeling like I was building something solid.
