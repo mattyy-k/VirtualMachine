@@ -118,3 +118,18 @@ Well... I wasn't wrong. That kinda was a shitstorm.
 -Ran into a couple of segfaults that had me screaming inside in the library (don't do this shit for more than 5 hours a day, kids 🙄). But segfaults were just undefined behaviour surfacing after invariants were violated. Can't even blame anything but my own saturated brain 😶‍🌫️.
 
 -I think this was the point I started feeling like I was building something solid.
+
+### Phase 4 (13/01/2026):
+GC was... Less of a nightmare than I'd thought. Or maybe I just finally got some good sleep yesterday.
+
+-The main realisation in this stage was that the heap is a graph. Objects in the heap may point to other objects. For example, if the heap object is an array, some Value elements in it may be ValueType::OBJECT which point to another array, which in turn have elements that point to other objects, and so on. I hope that immediately smells like recursion to you, whoever's reading this. Therefore, **the mark phase is inherently recursive** (or graph-traversal based). Garbage collection is a DFS/BFS graph traversal.
+
+-There **must** be strict separation between the mark phase and the sweep phase. If you mark during sweeping or sweep during marking... it's GGs bro. Garbage collection bugs like this rarely show up now. They slowly make you bleed more and more, until one day your VM can't function anymore.
+
+-This was probably the phase that required the most discipline so far. As I mentioned earlier, garbage collection bugs are pernicious little fucktwats. They're like opps that wait until you're at rock bottom to strike.
+
+Caveats:
+
+-Memory allotted to the heap object payload is freed during GC, but the heap slot is not removed. This is because I use heap index as operand stack object reference. Slot reuse will be implemented in later phases.
+
+-Garbage collection runs every time the number of objects on the heap exceeds 50. But what if the program actually needs more than 50 objects? The VM will end up running GC for every allotment after the 50th allotment. GC is costly: O(heapsize) complexity. A better system will be implemented in later phases.
