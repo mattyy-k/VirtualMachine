@@ -33,6 +33,7 @@ enum class HeapType {
     STRING,
     ARRAY
 };
+int allocatedSinceLastGC = 0;
 
 struct Value { //tagged union
     ValueType tag;
@@ -71,12 +72,16 @@ struct HeapObject {
     int size;
     string st;
     vector<Value> arr;
+    bool marked; // has reference from root (false -> destroyed, true -> alive)
+    bool free;
 
     static HeapObject String(string str){
         HeapObject ob;
         ob.type = HeapType::STRING;
         ob.st = str;
         ob.size = str.size();
+        ob.marked = false;
+        ob.free = false;
         return ob;
     }
     static HeapObject Array(int n){
@@ -84,6 +89,8 @@ struct HeapObject {
         ob.type = HeapType::ARRAY;
         ob.arr = vector<Value>(n, Value::Nil());
         ob.size = n;
+        ob.marked = false;
+        ob.free = false;
         return ob;
     }
     private:
@@ -106,6 +113,44 @@ struct VM {
     vector<HeapObject> heap; //heap
     VM(){ ip = 0; }
 };
+
+void markObject(int ob, VM &vm){
+    assert(ob < vm.heap.size());
+    assert(!vm.heap[ob].free);
+    if (vm.heap[ob].marked) return;
+
+    vm.heap[ob].marked = true;
+    if (vm.heap[ob].type == HeapType::ARRAY){
+        int n = vm.heap[ob].arr.size();
+        for (int i = 0; i < n; i++){
+            if (vm.heap[ob].arr[i].tag == ValueType::OBJECT) {
+                assert(vm.heap[ob].arr[i].data.objectHandle < vm.heap.size());
+                markObject(vm.heap[ob].arr[i].data.objectHandle, vm);
+            }
+        }
+    }
+}
+void markRoots(VM &vm){
+    int n = vm.opst.size();
+    for (int i = 0; i < n; i++){
+        if (vm.opst[i].tag == ValueType::OBJECT) markObject(vm.opst[i].data.objectHandle, vm);
+    }
+}
+void collectGarbage(VM &vm){
+    // Mark Phase (recursive):
+    markRoots(vm);
+    // Sweep Phase:
+    int n = vm.heap.size();
+    for (int i = 0; i < n; i++){
+        if (!vm.heap[i].marked) {
+            vm.heap[i].free = true;
+            if (vm.heap[i].type == HeapType::ARRAY) vm.heap[i].arr.erase(vm.heap[i].arr.begin(), vm.heap[i].arr.end());
+            else vm.heap[i].st.erase();
+            allocatedSinceLastGC--;
+        }
+        else vm.heap[i].marked = false;
+    }
+}
 
 int main (){
     VM vm;
@@ -224,6 +269,8 @@ int main (){
                 string str = vm.constants[index]; //bytecode references strings in a constant pool, since it cannot pass strings on its own.
                 int handle = vm.heap.size();
                 vm.heap.push_back(HeapObject::String(str));
+                allocatedSinceLastGC++;
+                if (allocatedSinceLastGC > 50) collectGarbage(vm);
                 vm.opst.push_back(Value::Object(handle));
                 continue;
             }
@@ -231,6 +278,8 @@ int main (){
                 int n = vm.bc[++vm.ip];
                 int handle = vm.heap.size();
                 vm.heap.push_back(HeapObject::Array(n));
+                allocatedSinceLastGC++;
+                if (allocatedSinceLastGC > 50) collectGarbage(vm);
                 vm.opst.push_back(Value::Object(handle));
                 continue;
             }
