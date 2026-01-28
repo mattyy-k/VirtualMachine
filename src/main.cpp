@@ -6,6 +6,7 @@
 #include <cassert>
 #include <unordered_map>
 #include <cctype>
+#include <queue>
 using namespace std;
 
 enum class Opcode {
@@ -102,6 +103,87 @@ struct Token {
     int line;
 };
 
+struct Expr {
+    virtual ~Expr() = default; // to enable polymorphism and consistent treatment of all expressions.
+    virtual void compile(Compiler &c){};
+};
+struct LiteralExpr : Expr {
+    Value value;
+
+    void compile (Compiler &c){
+        c.bytecode.push_back((int)Opcode::PUSH);
+        c.bytecode.push_back(value.data.intVal);
+    }
+
+    LiteralExpr(Value v) : value(v) {}
+};
+struct BinaryExpr : Expr {
+    Expr* left;
+    TokenType op;
+    Expr* right;
+
+    void compile(Compiler& c) {
+        left->compile(c);
+        right->compile(c);
+        c.bytecode.push_back((int)c.opcodeFor(op));
+    }
+
+    BinaryExpr(Expr* l, TokenType o, Expr* r) : left(l), right(r), op(o) {}
+};
+struct UnaryExpr : Expr {
+    TokenType op;
+    Expr* exp;
+
+    void compile(Compiler &c){
+        exp->compile(c);
+        if (op == TokenType::MINUS) c.bytecode.push_back((int)Opcode::NEG);
+        else if (op == TokenType::NOT) c.bytecode.push_back((int)Opcode::NOT);
+    }
+
+    UnaryExpr(TokenType o, Expr* e) : op(o), exp(e) {}
+};
+struct GroupingExpr : Expr {
+    Expr* exp;
+
+    void compile(Compiler &c){
+        exp->compile(c);
+    }
+
+    GroupingExpr(Expr* e) : exp(e) {}
+};
+struct IdentifierExpr : Expr {
+    string name;
+
+    IdentifierExpr(string n) : name(n) {}
+};
+struct ErrorExpr : Expr {
+    int line;
+    ErrorExpr(int l) : line(l) {}
+};
+
+struct Stmt {
+    virtual ~Stmt() = default;
+    virtual void compile(){};
+};
+struct ExprStmt : Stmt { // compile an expression
+    Expr* expr;
+    ExprStmt(Expr* e) : expr(e) {}
+};
+struct VarDeclStmt : Stmt { // introduce a name and store a local value on the callstack
+    string name;
+    Expr* initializerExpr;
+    VarDeclStmt(string n, Expr* e) : name(n), initializerExpr(e) {}
+};
+struct AssignmentStmt : Stmt { // modify an existing variable (variable must exist on the top of the callstack)
+    string name;
+    Expr* valueExpr;
+    AssignmentStmt(string n, Expr* e) : name(n), valueExpr(e) {}
+};
+struct ErrorStmt : Stmt {
+    int line;
+    ErrorStmt(int l) : line(l) {}
+};
+
 struct Value { //tagged union
     ValueType tag;
     union {
@@ -164,19 +246,18 @@ class Lexer {
 
     // helper functions:
     char peek(){
-        assert(index + 1 < source.size());
         if (index + 1 < source.size()) return source[index + 1];
-        else return '\0';
+        else { index++; return '\0'; }
+        index++;
         return '\0';
     }
     char advance(){
-        assert(index + 1 < source.size());
         if (index + 1 < source.size()) return source[index++];
-        else return '\0';
+        else { index++; return '\0'; }
+        index++;
         return '\0';
     }
     bool match(char c){
-        assert(index + 1 < source.size());
         if (index + 1 < source.size()) {
             if (source[index + 1] == c){
                 index++;
@@ -184,6 +265,7 @@ class Lexer {
             }
             else return false;
         }
+        index++;
         return false;
     }
 
@@ -422,69 +504,12 @@ class Compiler {
         {TokenType::PLUS, Opcode::ADD},
         {TokenType::MINUS, Opcode::SUB},
         {TokenType::MULTIPLY, Opcode::MUL},
-        {TokenType::LESS_THAN, Opcode::LESSTHAN}
+        {TokenType::LESS_THAN, Opcode::LESSTHAN},
+        {TokenType::EQUAL_EQUAL, Opcode::EQUAL}
     };
     Opcode opcodeFor(TokenType t){
         return map[t];
     }
-};
-
-struct Expr {
-    virtual ~Expr() = default; // to enable polymorphism and consistent treatment of all expressions.
-    virtual void compile(Compiler &c){};
-};
-struct LiteralExpr : Expr {
-    Value value;
-
-    void compile (Compiler &c){
-        c.bytecode.push_back((int)Opcode::PUSH);
-        c.bytecode.push_back(value.data.intVal);
-    }
-
-    LiteralExpr(Value v) : value(v) {}
-};
-struct BinaryExpr : Expr {
-    Expr* left;
-    TokenType op;
-    Expr* right;
-
-    void compile(Compiler& c) {
-        left->compile(c);
-        right->compile(c);
-        c.bytecode.push_back((int)c.opcodeFor(op));
-    }
-
-    BinaryExpr(Expr* l, TokenType o, Expr* r) : left(l), right(r), op(o) {}
-};
-struct UnaryExpr : Expr {
-    TokenType op;
-    Expr* exp;
-
-    void compile(Compiler &c){
-        exp->compile(c);
-        if (op == TokenType::MINUS) c.bytecode.push_back((int)Opcode::NEG);
-        else if (op == TokenType::NOT) c.bytecode.push_back((int)Opcode::NOT);
-    }
-
-    UnaryExpr(TokenType o, Expr* e) : op(o), exp(e) {}
-};
-struct GroupingExpr : Expr {
-    Expr* exp;
-
-    void compile(Compiler &c){
-        exp->compile(c);
-    }
-
-    GroupingExpr(Expr* e) : exp(e) {}
-};
-struct IdentifierExpr : Expr {
-    string name;
-
-    IdentifierExpr(string n) : name(n) {}
-};
-struct ErrorExpr : Expr {
-    int line;
-    ErrorExpr(int l) : line(l) {}
 };
 
 class Parser {
@@ -511,6 +536,49 @@ class Parser {
         if (index < tokens.size() && tokens[index].type == t) return true;
         return false;
     }
+    Token nextCheck(){
+        if (index + 1 < tokens.size()) return tokens[index + 1];
+        Token temp;
+        temp.type == TokenType::ENDOF;
+        return temp;
+    }
+    vector<Stmt*> parseProgram() {
+        vector<Stmt*> stmts;
+        while (peek().type != TokenType::ENDOF){
+            stmts.push_back(parseStatement());
+        }
+        return stmts;
+    }
+    Stmt* parseStatement(){
+        if (peek().type == TokenType::IDENTIFIER) {
+            if (nextCheck().type == TokenType::EQUAL){
+                string temp = peek().lexeme;
+                advance();
+                advance();
+                Stmt* stmt = new AssignmentStmt(temp, parseExpression());
+                if (peek().type == TokenType::SEMICOLON) advance();
+                return stmt;
+            }
+            else {
+                Stmt* stmt = new ExprStmt(parseExpression());
+                if (peek().type == TokenType::SEMICOLON) advance();
+                return stmt;
+            }
+        }
+        else if (peek().type == TokenType::LET){
+            advance();
+            if (peek().type == TokenType::IDENTIFIER){
+                string temp = peek().lexeme;
+                advance();
+                if (peek().type == TokenType::EQUAL) advance();
+                Stmt* stmt = new VarDeclStmt(temp, parseExpression());
+                if (peek().type == TokenType::SEMICOLON) advance();
+                return stmt;
+            }
+        }
+        perror("Error: Unexpected token at statement");
+        return new ErrorStmt(peek().line);
+    }
 
     Expr* parseExpression(){
         return parseEquality();
@@ -522,7 +590,7 @@ class Parser {
             advance();
             Expr* right = parseComparison();
 
-            left = new BinaryExpr(left, operand, right); // reassigning it to left to support chains
+            left = new BinaryExpr(left, operand, right); // reassigning it to left to support chaining
         }
         return left;
     }
@@ -544,7 +612,7 @@ class Parser {
             advance();
             Expr* right = parseFactor();
 
-            left = new BinaryExpr(left, operand, right);
+            left = new BinaryExpr(left, operand, right); // again, reassigning it to left to support chaining
         }
         
         return left;
@@ -655,6 +723,7 @@ struct VM {
     }
 };
 
+queue<int> freedheap;
 void markObject(int ob, VM &vm){
     assert(ob < vm.heap.size());
     assert(!vm.heap[ob].free);
@@ -673,8 +742,13 @@ void markObject(int ob, VM &vm){
 }
 void markRoots(VM &vm){
     int n = vm.opst.size();
-    for (int i = 0; i < n; i++){
-        if (vm.opst[i].tag == ValueType::OBJECT) markObject(vm.opst[i].data.objectHandle, vm);
+    for (const auto& val : vm.opst) {
+        if (val.tag == ValueType::OBJECT) markObject(val.data.objectHandle, vm);
+    }
+    for (const auto& x : vm.callst){
+        for (const auto& v : x.locals){
+            if (v.tag == ValueType::OBJECT) markObject(v.data.objectHandle, vm); // marking locals on the callstack.
+        }
     }
 }
 void collectGarbage(VM &vm){
@@ -685,6 +759,7 @@ void collectGarbage(VM &vm){
     for (int i = 0; i < n; i++){
         if (!vm.heap[i].marked) {
             vm.heap[i].free = true;
+            freedheap.push(i);
             if (vm.heap[i].type == HeapType::ARRAY) vm.heap[i].arr.erase(vm.heap[i].arr.begin(), vm.heap[i].arr.end());
             else vm.heap[i].st.erase();
             allocatedSinceLastGC--;
@@ -695,7 +770,7 @@ void collectGarbage(VM &vm){
 
 int main (){
     VM vm;
-    string src = "int x = 5;\nint b =(x +5)/2;"; // take the entire program as input string.
+    string src = "!(1 + 2 == 5)"; // take the entire program as input string.
     Lexer lexer(src);
     vector<Token> tokens = lexer.scanTokens();
     Parser parser(tokens);
@@ -703,10 +778,11 @@ int main (){
     Compiler c;
     ast->compile(c);
     vm.bc = c.bytecode;
+    for (auto x : c.bytecode) cout << x << " "; cout << "\n";
 
     bool running = true;
     while (running){
-        assert(vm.ip >= 0 && vm.ip < vm.bc.size());
+        //assert(vm.ip >= 0 && vm.ip < vm.bc.size());
         Opcode oc = (Opcode) vm.bc[vm.ip];
         switch (oc){
             case Opcode::PUSH: {
@@ -808,7 +884,8 @@ int main (){
                 assert(vm.bc.size() > vm.ip + 1);
                 int index = vm.bc[++vm.ip];
                 string str = vm.constants[index]; //bytecode references strings in a constant pool, since it cannot pass strings on its own.
-                int handle = vm.heap.size();
+                int handle = (!freedheap.empty() ? freedheap.front() :  vm.heap.size());
+                if (!freedheap.empty()) freedheap.pop();
                 vm.heap.push_back(HeapObject::String(str));
                 allocatedSinceLastGC++;
                 if (allocatedSinceLastGC > 50) collectGarbage(vm);
@@ -817,7 +894,8 @@ int main (){
             }
             case Opcode::ALLOC_ARRAY:{
                 int n = vm.bc[++vm.ip];
-                int handle = vm.heap.size();
+                int handle = (!freedheap.empty() ? freedheap.front() :  vm.heap.size());
+                if (!freedheap.empty()) freedheap.pop();
                 vm.heap.push_back(HeapObject::Array(n));
                 allocatedSinceLastGC++;
                 if (allocatedSinceLastGC > 50) collectGarbage(vm);
@@ -878,6 +956,17 @@ int main (){
                 vm.opst.push_back(Value::Bool(ret));
                 continue;
             }
+            case Opcode::EQUAL:{
+                Value right = vm.opst.back();
+                vm.opst.pop_back();
+
+                Value left = vm.opst.back();
+                vm.opst.pop_back();
+
+                bool ret = left.data.intVal == right.data.intVal;
+                vm.opst.push_back(Value::Bool(ret));
+                continue;
+            }
             case Opcode::LESSTHAN:{
                 Value right = vm.opst.back();
                 vm.opst.pop_back();
@@ -919,6 +1008,7 @@ int main (){
             case Opcode::SET_LOCAL:{
                 int n = vm.bc[++vm.ip];
                 int val = vm.opst.back().data.intVal;
+                vm.opst.pop_back();
                 vm.callst.back().locals[n] = Value::Int(val);
                 continue;
             }
@@ -932,7 +1022,7 @@ int main (){
                 assert(vm.opst.back().tag == ValueType::BOOL);
                 bool v = vm.opst.back().data.boolVal;
                 vm.opst.pop_back();
-                vm.opst.push_back(Value::Int(!v));
+                vm.opst.push_back(Value::Bool(!v));
                 continue;
             }
             case Opcode::RET:{
