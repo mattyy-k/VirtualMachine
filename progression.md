@@ -133,3 +133,156 @@ Caveats:
 -Memory allotted to the heap object payload is freed during GC, but the heap slot is not removed. This is because I use heap index as operand stack object reference. Slot reuse will be implemented in later phases.
 
 -Garbage collection runs every time the number of objects on the heap exceeds 50. But what if the program actually needs more than 50 objects? The VM will end up running GC for every allotment after the 50th allotment. GC is costly: O(heapsize) complexity. A better system will be implemented in later phases.
+
+### Phase 5 (I don't even remember the date bro not gonna lie)
+I don't remember the date because I forgot to update this file when I completed that phase 💀. You can probably imagine, dear reader, how fucking DONE with this shit I was at that point. Well, anyway, I'm back now. I think.
+
+This phase is where the project started going from 'glorified switch statement which gobbles up hardcoded bytecode and calls it a good day's work' to 'lowkey a serious language runtime with which you can compile and execute a program'.
+
+The pipeline I decided on was:
+ _______________________________
+|  Source Code                  |
+|     ↓                         |
+|  Lexer (characters → tokens)  |
+|     ↓                         |
+|  Parser (tokens → AST)        |
+|     ↓                         |
+|  Compiler (AST → bytecode)    |
+|     ↓                         |
+|  VM (bytecode → execution)    |
+|_______________________________|
+(that box I made around the pipeline architecture took me longer than I expected to make it :/)
+
+This phase was pretty big, so it's best to split it into parts:
+#### 5.1: Lexer (Characters → Tokens)
+Source code is NOT processed as words or whitespace-separated units, contrary to common belief. Instead, the program is a stream of characters. The lexer converts this into a stream of tokens.
+Each struct Token has a type (enum class TokenType in my code), lexeme (which is basically the original word in the program before it was converted to a token), and a line number.
+Example: let x = 5 processed to → LET, IDENTIFIER(x), EQUAL, INTEGER(5), SEMICOLON.
+
+-The biggest insight in one line:
+'The lexer does not know what a variable or expression is. It only knows what characters belong together.'
+
+Some things that had me lowkey tweaking out in the library:
+-Off-by-one errors when advancing the index. THIS was the biggest one, and DAMN was it annoying. It's so deceptively easy to lose synchronicity in your VM. If I had just blindly forged on, it would've come back to bite me in my (well-muscled) butt in later stages. Luckily, my special brand of OCD does NOT let me move on, however much I just wanna die. (Google usually gives you the national helpline when you say shit like that, but my fellow systems people know exactly what I'm talking about)
+-peek() assertions failing at end-of-input.
+-Double incrementing index.
+-Misunderstanding when to advance vs when to inspect.
+
+Key lesson:
+Most lexer bugs are pointer movement bugs. Stupid thing slips through your hands faster than a ping-pog ball.
+
+#### Stage 5.2 — Parser (Tokens → AST)
+**The big conceptual shift.**
+The compiler is a lot dumber than I thought. Most of the logical work is done by the Parser. Just tokens is not enough, the compiler needs structure. That structure is thr Abstract Syntax Tree, which is constructed by the Parser.
+
+expression → equality
+equality   → comparison (== | != comparison)*
+comparison → term (> < >= <= term)*
+term       → factor (+ | - factor)*
+factor     → unary (* / % unary)*
+unary      → (! | -) unary | primary
+
+This shit was probably the most mind-blowing concept in the whole VM so far, so bear with me while I fangirl a bit. It's SO fucking neat how the recursion structure enforces precedence. When I first learnt this, I actually closed my laptop and just stared off into space, enjoying the insane dopamine rush from learning it. Some poor guy probably wondered why a random buffoon was giving him a thousand-yard stare in the library lol
+Some other interesting things:
+-Reassigning left in Binary Expressions (to support chaining).
+-Wrapping everything in Expr (basically for the compiler to be able to hit Expr->compile(). Damn, is the compiler a lazy piece of shit. It's like Gilderoy Lockhart from Harry Potter-it has all the good rep despite all of its work having been done by others.)
+
+The AST is the last human-readable representation.
+
+#### Stage 5.3 — AST → Bytecode Compilation
+Compilation is just a tree walk. A postorder traversal of the AST, if you will.
+For example, for binary expressions:
+
+left->compile()
+right->compile()
+emit opcode
+
+This naturally produces stack-based bytecode:
+
+PUSH 1
+PUSH 2
+ADD
+
+-The AST itself defines the evaluation order.
+-Absolutely NO explicit VM opstack management in the compiler. The compiler doesn't even know that the stack exists, it just emits instructions in the logical order already determined by the AST.
+
+Some annoying stuff:
+-My caffeine-abused ass didn't realise I had to map TokenType → Opcode. So I spent an embarrassing amount of time having midlife crises at 19 while my compiler emitted TokenType enumerations in the bytecode instead of Opcode ones. I screamed into my pillow (metaphorically, of course) when I realised.
+-Grouping expressions literally do nothing. They just forward compilation. Like bruh, stop wasting oxygen 🙄
+
+#### Stage 5.4 — Statements (Expressions Were Not Enough)
+
+This was a considerable mental shift, if not one of the biggest ones:
+Expressions compute values. Statements do things.
+A program is not a list of expresssions. It's a list of statements.
+
+Parser changed from 
+parseExpression()
+to
+parseProgram() → parseStatement().
+
+Statements are what we see when we zoom out. They're the smallest meaningful building block of a program.
+
+#### Stage 5.5 — Locals and Variable Slots
+
+Variables are not stored by name at runtime.
+Instead:
+
+x → slot 0
+y → slot 1
+
+Compiler maintains:
+unordered_map<string, int> varSlots
+int nextLocalSlot
+
+VM only sees numeric slots.
+
+Important realization: The compiler resolves names. The VM only handles indices.
+This separation simplifies runtime execution enormously, and was something I kept botching up: mixing compiler responsibilities with VM behaviour.
+
+Bugs encountered
+-Missing global callframe (turns out, you have to push a global callframe at the beginning of the program, which made a horrible amount of sense), which incidentally lead to out of bounds local access → segfaults.
+-SET_LOCAL popping stack twice
+-GET_LOCAL accessing empty locals array
+
+This was where stack discipline became critical.
+
+#### Stage 5.6 — Control Flow (if / while)
+
+This introduced the first non-linear execution. Although you might realise, whoever's reading this, that we did face a similar model earlier. In the CALl/RET phase. The difference here is, the program continues 
+
+Concept DLC unlocked: Backpatching
+When compiling, the structure is:
+if (cond) {...}, or while(cond){...}.
+So just compile the condition, push it onto the stack, emit a JUMP_IF_FALSE Opcode, and set the index to which you should jump to. Simple enough, right? Well, except you have no idea where you should jump to during compilation. So emit a random placeholder index, compile the block, and then revisit it to change it. This is what all compilers do.
+
+Major sources of confusion/crashes:
+-IfStmt must include both the condition AND the Block to be executed if the condition is true.
+-Each IfStmt MUST deal with its own compilation. State cannot be globally maintained, because nested blocks can and will overwrite state and cause chaos.
+-Not incrementing IP in the VM
+-Stack not cleaned after conditions
+-Stack cleaned twice after conditions (yes, really. I have moments of profound idiocy, and that shouldn't be surprising.)
+-The compiler should NEVER perform arithmetic while emitting/patching jump index. At any point, it should only read the size of the bytecode so far, so be careful in where you do that.
+
+I think the biggest and most elusive change in this phase was psychological: Earlier phases felt concept-heavy but straightforward. Phase 5 required trusting abstractions:
+
+Lexer doesn’t understand meaning.
+Parser doesn’t execute.
+Compiler doesn’t store values.
+VM doesn’t know variable names.
+Each layer does one thing only.
+
+Once this separation clicked, development accelerated dramatically, although the code was the most boring and mechanical (but extensive-my code more than doubled in line count in this stage alone) so far. But mixing the layers' responsibilities was definitely what caused the most pain in this phase. You have to trust what you're building; trust the separation of responsibilities between the layers.
+
+But okay so basically (hear me out 💀) we ripped the source code apart character-by-character, made tokens from it, assembled those tokens into expressions, and wrapped expressions into statements back again. Kinda retarded, or so I thought when the big picture first became clear to me. But thinking about it like this helped:
+**Why This Architecture Exists (In Practice):**
+At first glance, the pipeline looks unnecessarily complicated. Why not interpret source code directly?
+Because each stage removes one kind of complexity:
+
+Lexer removes character-level ambiguity.
+Parser removes syntactic ambiguity.
+Compiler removes structural complexity.
+VM executes only simple instructions.
+
+Each layer converts a complex problem into a simpler one for the next layer.
+Without this separation, every part of the system would need to understand everything else.
