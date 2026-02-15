@@ -38,6 +38,9 @@ enum class Opcode {
     GRTREQUAL,
     EQUAL,
     NOTEQUAL,
+    PRINT,
+    JUMP_IF_FALSE,
+    JUMP,
 
     HALT
 };
@@ -94,6 +97,7 @@ enum class TokenType {
     RETURN,
     WHILE,
     NIL,
+    PRINT,
     ENDOF
 };
 
@@ -102,11 +106,89 @@ struct Token {
     string lexeme;
     int line;
 };
-
+class Compiler;
 struct Expr {
     virtual ~Expr() = default; // to enable polymorphism and consistent treatment of all expressions.
     virtual void compile(Compiler &c){};
 };
+
+struct Stmt {
+    virtual ~Stmt() = default;
+    virtual void compile(Compiler& c){};
+};
+
+class Compiler {
+    public:
+    vector<int> bytecode;
+    int nextLocalSlot = 0;
+    
+    Opcode opcodeFor(TokenType t) {
+        switch (t) {
+            case TokenType::PLUS: return Opcode::ADD;
+            case TokenType::MINUS: return Opcode::SUB;
+            case TokenType::MULTIPLY: return Opcode::MUL;
+            case TokenType::DIVIDE: return Opcode::DIV;
+
+            case TokenType::EQUAL_EQUAL: return Opcode::EQUAL;
+            case TokenType::NOTEQUAL: return Opcode::NOTEQUAL;
+            case TokenType::LESS_THAN: return Opcode::LESSTHAN;
+            case TokenType::LESSEQUAL: return Opcode::LESSEQUAL;
+            case TokenType::GRTR_THAN: return Opcode::GRTRTHAN;
+            case TokenType::GRTREQL: return Opcode::GRTREQUAL;
+
+            default: assert(false);
+        }
+    }
+    unordered_map<string, int> varSlots;
+
+    vector<int> compileProgram(vector<Stmt*> stmts){
+        for (auto stmt : stmts){
+            stmt->compile(*this);
+        }
+        bytecode.push_back((int)Opcode::HALT);
+        return bytecode;
+    }
+};
+struct Value { //tagged union
+    ValueType tag;
+    union {
+        int intVal;
+        bool boolVal;
+        int objectHandle;
+        //later-> float, etc.
+    } data;
+    
+    // static factory functions:
+    
+    static Value Int(int x){
+        Value v;
+        v.tag = ValueType::INT;
+        v.data.intVal = x;
+        return v;
+    }
+
+    static Value Bool(bool x){
+        Value v;
+        v.tag = ValueType::BOOL;
+        v.data.boolVal = x;
+        return v;
+    }
+
+    static Value Nil(){
+        Value v;
+        v.tag = ValueType::NIL;
+        return v;
+    }
+
+    static Value Object(int handle){
+        Value v;
+        v.tag = ValueType::OBJECT;
+        v.data.objectHandle = handle;
+        return v;
+    }
+    Value(){ tag = ValueType::NIL; } // to prevent accidental default construction.
+};
+
 struct LiteralExpr : Expr {
     Value value;
 
@@ -155,73 +237,134 @@ struct IdentifierExpr : Expr {
     string name;
 
     IdentifierExpr(string n) : name(n) {}
+    void compile(Compiler& c){
+        int n = c.varSlots[name];
+        c.bytecode.push_back((int)Opcode::GET_LOCAL);
+        c.bytecode.push_back(n);
+    }
 };
 struct ErrorExpr : Expr {
     int line;
     ErrorExpr(int l) : line(l) {}
 };
 
-struct Stmt {
-    virtual ~Stmt() = default;
-    virtual void compile(){};
-};
 struct ExprStmt : Stmt { // compile an expression
     Expr* expr;
     ExprStmt(Expr* e) : expr(e) {}
+    void compile(Compiler& c){
+        expr->compile(c);
+        c.bytecode.push_back((int)Opcode::POP);
+    }
 };
 struct VarDeclStmt : Stmt { // introduce a name and store a local value on the callstack
     string name;
     Expr* initializerExpr;
     VarDeclStmt(string n, Expr* e) : name(n), initializerExpr(e) {}
+
+    void compile(Compiler& c){
+        initializerExpr->compile(c); // push compiled value onto the stack
+        c.varSlots[name] = c.nextLocalSlot;
+        c.bytecode.push_back((int)Opcode::SET_LOCAL); // push setlocal back into bytecode
+        c.bytecode.push_back(c.nextLocalSlot);
+        c.nextLocalSlot++;
+        c.bytecode.push_back((int)Opcode::POP); // pop compiled value from stack
+    }
 };
 struct AssignmentStmt : Stmt { // modify an existing variable (variable must exist on the top of the callstack)
     string name;
     Expr* valueExpr;
     AssignmentStmt(string n, Expr* e) : name(n), valueExpr(e) {}
+    void compile(Compiler& c){
+        valueExpr->compile(c); //compile value
+        c.bytecode.push_back((int)Opcode::SET_LOCAL); // emit set local
+        c.bytecode.push_back(c.varSlots[name]); // emit index of variable in the locals vector
+        c.bytecode.push_back((int)Opcode::POP);
+    }
 };
 struct ErrorStmt : Stmt {
     int line;
-    ErrorStmt(int l) : line(l) {}
+    ErrorStmt(int l) : line(l) {
+        assert(0 > 1);
+    }
+    void compile(Compiler& c){
+        assert(0 > 1);
+    }
 };
+struct AssignmentExpr : Expr {
+    string name;
+    Expr* valueExpr;
+    AssignmentExpr(string n, Expr* e) : name(n), valueExpr(e) {}
 
-struct Value { //tagged union
-    ValueType tag;
-    union {
-        int intVal;
-        bool boolVal;
-        int objectHandle;
-        //later-> float, etc.
-    } data;
-    
-    // static factory functions:
-    
-    static Value Int(int x){
-        Value v;
-        v.tag = ValueType::INT;
-        v.data.intVal = x;
-        return v;
+    void compile(Compiler& c) {
+        valueExpr->compile(c); // Pushes value to stack
+        c.bytecode.push_back((int)Opcode::SET_LOCAL);
+        c.bytecode.push_back(c.varSlots[name]); // value stays on the stack.
     }
+};
+struct PrintStmt : Stmt {
+    Expr* expr;
+    PrintStmt(Expr* e) : expr(e) {}
 
-    static Value Bool(bool x){
-        Value v;
-        v.tag = ValueType::BOOL;
-        v.data.boolVal = x;
-        return v;
+    void compile(Compiler& c) {
+        expr->compile(c);
+        c.bytecode.push_back((int)Opcode::PRINT);
     }
+};
+struct BlockStmt : Stmt {
+    vector<Stmt*> stmts;
+    BlockStmt(vector<Stmt*> v) : stmts(v) {}
 
-    static Value Nil(){
-        Value v;
-        v.tag = ValueType::NIL;
-        return v;
+    void compile(Compiler& c){
+        for (auto stmt : stmts){
+            stmt->compile(c);
+        }
     }
+};
+struct IfStmt : Stmt {
+    Expr* cond;
+    Stmt* block;
+    IfStmt(Expr* e, Stmt* b) : cond(e), block(b) {}
 
-    static Value Object(int handle){
-        Value v;
-        v.tag = ValueType::OBJECT;
-        v.data.objectHandle = handle;
-        return v;
+    int emitJump(Opcode jumptype, Compiler& c){
+        c.bytecode.push_back((int)jumptype);
+        return c.bytecode.size();
     }
-    Value(){ tag = ValueType::NIL; } // to prevent accidental default construction.
+    void patchJump(int jumpInd, Compiler& c){
+        c.bytecode[jumpInd] = c.bytecode.size();
+    }
+    void compile(Compiler& c){
+        cond->compile(c);
+        int jumpIndex = emitJump(Opcode::JUMP_IF_FALSE, c);
+        c.bytecode.push_back(0); //temporary value
+        block->compile(c);
+        patchJump(jumpIndex, c); // backpatch the jump index
+    }
+};
+struct WhileStmt : Stmt {
+    Expr* cond;
+    Stmt* block;
+    WhileStmt(Expr* e, Stmt* b) : cond(e), block(b) {}
+
+    int emitJump(Opcode jumptype, Compiler& c){
+        c.bytecode.push_back((int)jumptype);
+        return c.bytecode.size();
+    }
+    void emitJump(Compiler& c, Opcode jumptype, int ls){
+        c.bytecode.push_back((int)Opcode::JUMP);
+        c.bytecode.push_back(ls);
+    }
+    void patchJump(int jumpInd, Compiler& c){
+        c.bytecode[jumpInd] = c.bytecode.size();
+    }
+    void compile(Compiler& c){
+        int loopStart = c.bytecode.size();
+        cond->compile(c);
+        int jumpIndex = emitJump(Opcode::JUMP_IF_FALSE, c);
+        c.bytecode.push_back(0); //temporary value
+        block->compile(c);
+        emitJump(c, Opcode::JUMP, loopStart);
+        patchJump(jumpIndex, c);
+    }
 };
 
 class Lexer {
@@ -238,7 +381,8 @@ class Lexer {
         {"else", TokenType::ELSE},
         {"while", TokenType::WHILE},
         {"return", TokenType::RETURN},
-        {"nil", TokenType::NIL}
+        {"nil", TokenType::NIL},
+        {"print", TokenType::PRINT}
     };
     
     vector<Token> tokens;
@@ -464,7 +608,7 @@ class Lexer {
             else {
                 if (isalpha(c) || c == '_'){
                     int start = index;
-                    while (index < source.size() && (isalnum(peek()) || peek() == '_')) index++;
+                    while (index < source.size() && (isalnum(peek()) || peek() == '_')) { index++; }
                     index++;
 
                     Token temp;
@@ -497,21 +641,6 @@ class Lexer {
     }
 };
 
-class Compiler {
-    public:
-    vector<int> bytecode;
-    unordered_map<TokenType, Opcode> map {
-        {TokenType::PLUS, Opcode::ADD},
-        {TokenType::MINUS, Opcode::SUB},
-        {TokenType::MULTIPLY, Opcode::MUL},
-        {TokenType::LESS_THAN, Opcode::LESSTHAN},
-        {TokenType::EQUAL_EQUAL, Opcode::EQUAL}
-    };
-    Opcode opcodeFor(TokenType t){
-        return map[t];
-    }
-};
-
 class Parser {
     public:
     vector<Token> tokens;
@@ -522,7 +651,7 @@ class Parser {
     Token peek (){
         if (index < tokens.size()) return tokens[index];
         Token temp;
-        temp.type == TokenType::ENDOF;
+        temp.type = TokenType::ENDOF;
         return temp;
     }
     void advance(){
@@ -539,7 +668,7 @@ class Parser {
     Token nextCheck(){
         if (index + 1 < tokens.size()) return tokens[index + 1];
         Token temp;
-        temp.type == TokenType::ENDOF;
+        temp.type = TokenType::ENDOF;
         return temp;
     }
     vector<Stmt*> parseProgram() {
@@ -550,6 +679,11 @@ class Parser {
         return stmts;
     }
     Stmt* parseStatement(){
+        if (match(TokenType::PRINT)) {
+            Expr* value = parseExpression();
+            if (check(TokenType::SEMICOLON)) advance();
+            return new PrintStmt(value);
+        }
         if (peek().type == TokenType::IDENTIFIER) {
             if (nextCheck().type == TokenType::EQUAL){
                 string temp = peek().lexeme;
@@ -565,8 +699,7 @@ class Parser {
                 return stmt;
             }
         }
-        else if (peek().type == TokenType::LET){
-            advance();
+        else if (match(TokenType::LET)){
             if (peek().type == TokenType::IDENTIFIER){
                 string temp = peek().lexeme;
                 advance();
@@ -576,12 +709,71 @@ class Parser {
                 return stmt;
             }
         }
+        else if (match(TokenType::IF)){
+            if (match(TokenType::LEFT_PAREN)){
+                Expr* cond = parseExpression();
+                if (!match(TokenType::RIGHT_PAREN)) {
+                    perror("Expected ')'");
+                }
+                
+                Stmt* block = parseStatement();
+                Stmt* ifstmt = new IfStmt(cond, block);
+                return ifstmt;
+            }
+            //else compiler error
+        }
+        else if (match(TokenType::WHILE)){
+            if (match(TokenType::LEFT_PAREN)){
+                Expr* cond = parseExpression();
+                if (!match(TokenType::RIGHT_PAREN)) {
+                    perror("Expected ')'");
+                }
+                
+                Stmt* block = parseStatement();
+                Stmt* whstmt = new WhileStmt(cond, block);
+                return whstmt;
+            }
+            // else compiler error
+        }
+        else if (match(TokenType::LEFT_BRACE)){
+            vector<Stmt*> stmts;
+            while (peek().type != TokenType::RIGHT_BRACE && peek().type != TokenType::ENDOF){
+                stmts.push_back(parseStatement());
+            }
+            advance(); //consume right brace
+            return new BlockStmt(stmts);
+        }
+        else //if (peek().type == TokenType::INTEGER) - WRONG, because statements can start with '-', '!', '(', etc, not just integers.
+        {
+            Stmt* stmt = new ExprStmt(parseExpression());
+            if (peek().type == TokenType::SEMICOLON) advance();
+            return stmt;
+        }
         perror("Error: Unexpected token at statement");
-        return new ErrorStmt(peek().line);
+        advance();
+        Stmt* error = new ErrorStmt(peek().line);
+        return error;
+
     }
 
-    Expr* parseExpression(){
-        return parseEquality();
+    Expr* parseExpression() {
+    return parseAssignment(); // New top of the chain
+    }
+
+    Expr* parseAssignment() {
+        Expr* expr = parseEquality(); // Fall through to math
+
+        if (match(TokenType::EQUAL)) {
+            Token equals = tokens[index - 1];
+            Expr* value = parseAssignment(); // Right-associative
+
+            if (IdentifierExpr* i = dynamic_cast<IdentifierExpr*>(expr)) {
+                return new AssignmentExpr(i->name, value); // Change this to an EXPR
+            }
+            perror("Invalid assignment target.");
+        }
+
+        return expr;
     }
     Expr* parseEquality(){
         Expr* left = parseComparison();
@@ -667,6 +859,7 @@ class Parser {
         int line = tokens[index].line;
         Expr* error = new ErrorExpr(line);
         cerr << "Expected Expression on Line " << line;
+        advance();
         return error;
     }
 };
@@ -770,102 +963,129 @@ void collectGarbage(VM &vm){
 
 int main (){
     VM vm;
-    string src = "!(1 + 2 == 5)"; // take the entire program as input string.
+    ifstream file("program.vm");
+    string src(
+        (istreambuf_iterator<char>(file)),
+        istreambuf_iterator<char>()
+    ); // take the entire program as input string.
     Lexer lexer(src);
     vector<Token> tokens = lexer.scanTokens();
     Parser parser(tokens);
-    Expr* ast = parser.parseExpression();
+    vector<Stmt*> stmts = parser.parseProgram();
     Compiler c;
-    ast->compile(c);
-    vm.bc = c.bytecode;
+    vm.bc = c.compileProgram(stmts);
+    vm.callst.push_back(callFrame(0, 0));
     for (auto x : c.bytecode) cout << x << " "; cout << "\n";
 
     bool running = true;
     while (running){
-        //assert(vm.ip >= 0 && vm.ip < vm.bc.size());
+        assert(vm.ip >= 0 && vm.ip < vm.bc.size());
         Opcode oc = (Opcode) vm.bc[vm.ip];
         switch (oc){
             case Opcode::PUSH: {
                 Value value = Value::Int(vm.bc[++vm.ip]);
                 vm.opst.push_back(value);
+
+                cout << "Pushed " << value.data.intVal << endl; // all such prints are for debugging purposes
                 vm.ip++;
                 continue;
             }
             case Opcode::POP:{
                 assert(vm.opst.size() >= 1);
                 vm.opst.pop_back();
+
+                cout << "Popped" << endl;
                 vm.ip++;
                 continue;
             }
             case Opcode::ADD:{
                 assert(vm.opst.size() >= 2);
                 Value op2 = vm.opst.back();
-                assert(op2.tag == ValueType::INT);
+                assert(op2.tag == ValueType::INT || op2.tag == ValueType::BOOL); // as bool is implicitly convertible to int
                 vm.opst.pop_back();
 
                 Value op1 = vm.opst.back();
-                assert(op1.tag == ValueType::INT);
+                assert(op1.tag == ValueType::INT || op1.tag == ValueType::BOOL);
                 vm.opst.pop_back();
-
+                op1.data.intVal = (op1.tag == ValueType::BOOL ? (int)op1.data.boolVal : op1.data.intVal);
+                op2.data.intVal = (op2.tag == ValueType::BOOL ? (int)op2.data.boolVal : op2.data.intVal);
                 vm.opst.push_back(Value::Int(op1.data.intVal+op2.data.intVal));
+
+                cout << "Added " << op1.data.intVal << " and " << op2.data.intVal << endl;
                 vm.ip++;
                 continue;
             }
             case Opcode::SUB:{
                 assert(vm.opst.size() >= 2);
                 Value op2 = vm.opst.back();
-                assert(op2.tag == ValueType::INT);
+                assert(op2.tag == ValueType::INT || op2.tag == ValueType::BOOL);
                 vm.opst.pop_back();
 
                 Value op1 = vm.opst.back();
-                assert(op1.tag == ValueType::INT);
+                assert(op1.tag == ValueType::INT || op1.tag == ValueType::BOOL);
                 vm.opst.pop_back();
 
+                op1.data.intVal = (op1.tag == ValueType::BOOL ? (int)op1.data.boolVal : op1.data.intVal);
+                op2.data.intVal = (op2.tag == ValueType::BOOL ? (int)op2.data.boolVal : op2.data.intVal);
                 vm.opst.push_back(Value::Int(op1.data.intVal-op2.data.intVal));
+
+                cout << "Subtracted " << op1.data.intVal << " and " << op2.data.intVal << endl;
                 vm.ip++;
                 continue;
             }
             case Opcode::MUL:{
                 assert(vm.opst.size() >= 2);
                 Value op2 = vm.opst.back();
-                assert(op2.tag == ValueType::INT);
+                assert(op2.tag == ValueType::INT || op2.tag == ValueType::BOOL);
                 vm.opst.pop_back();
 
                 Value op1 = vm.opst.back();
-                assert(op1.tag == ValueType::INT);
+                assert(op1.tag == ValueType::INT || op1.tag == ValueType::BOOL);
                 vm.opst.pop_back();
 
+                op1.data.intVal = (op1.tag == ValueType::BOOL ? (int)op1.data.boolVal : op1.data.intVal);
+                op2.data.intVal = (op2.tag == ValueType::BOOL ? (int)op2.data.boolVal : op2.data.intVal);
                 vm.opst.push_back(Value::Int(op1.data.intVal*op2.data.intVal));
+
+                cout << "Multiplied " << op1.data.intVal << " and " << op2.data.intVal << endl;
                 vm.ip++;
                 continue;
             }
             case Opcode::DIV:{
                 assert(vm.opst.size() >= 2);
                 Value op2 = vm.opst.back();
-                assert(op2.tag == ValueType::INT);
+                assert(op2.tag == ValueType::INT || op2.tag == ValueType::BOOL);
                 assert(op2.data.intVal != 0);
                 vm.opst.pop_back();
 
                 Value op1 = vm.opst.back();
-                assert(op1.tag == ValueType::INT);
+                assert(op1.tag == ValueType::INT || op1.tag == ValueType::BOOL);
                 vm.opst.pop_back();
 
+                op1.data.intVal = (op1.tag == ValueType::BOOL ? (int)op1.data.boolVal : op1.data.intVal);
+                op2.data.intVal = (op2.tag == ValueType::BOOL ? (int)op2.data.boolVal : op2.data.intVal);
                 vm.opst.push_back(Value::Int(op1.data.intVal/op2.data.intVal));
+
+                cout << "Divided " << op1.data.intVal << " and " << op2.data.intVal << endl;
                 vm.ip++;
                 continue;
             }
             case Opcode::MOD:{
                 assert(vm.opst.size() >= 2);
                 Value op2 = vm.opst.back();
-                assert(op2.tag == ValueType::INT);
+                assert((op2.tag == ValueType::INT || op2.tag == ValueType::BOOL));
                 assert(op2.data.intVal != 0);
                 vm.opst.pop_back();
 
                 Value op1 = vm.opst.back();
-                assert(op1.tag == ValueType::INT);
+                assert(op1.tag == ValueType::INT || op1.tag == ValueType::BOOL);
                 vm.opst.pop_back();
 
+                op1.data.intVal = (op1.tag == ValueType::BOOL ? (int)op1.data.boolVal : op1.data.intVal);
+                op2.data.intVal = (op2.tag == ValueType::BOOL ? (int)op2.data.boolVal : op2.data.intVal);
                 vm.opst.push_back(Value::Int(op1.data.intVal%op2.data.intVal));
+
+                cout << "Mod " << op1.data.intVal << " and " << op2.data.intVal << endl;
                 vm.ip++;
                 continue;
             }
@@ -878,6 +1098,8 @@ int main (){
                 callFrame cf(vm.ip + 2, vm.opst.size());
                 vm.callst.push_back(cf);
                 vm.ip = vm.bc[vm.ip + 1];
+
+                cout << "Called @ " << vm.ip << endl;
                 continue;
             }
             case Opcode::ALLOC_STRING:{
@@ -890,6 +1112,8 @@ int main (){
                 allocatedSinceLastGC++;
                 if (allocatedSinceLastGC > 50) collectGarbage(vm);
                 vm.opst.push_back(Value::Object(handle));
+
+                cout << "Allocated string" << str << endl;
                 continue;
             }
             case Opcode::ALLOC_ARRAY:{
@@ -900,6 +1124,8 @@ int main (){
                 allocatedSinceLastGC++;
                 if (allocatedSinceLastGC > 50) collectGarbage(vm);
                 vm.opst.push_back(Value::Object(handle));
+
+                cout << "Allocated array " << endl;
                 continue;
             }
             case Opcode::GET_INDEX:{
@@ -915,6 +1141,9 @@ int main (){
 
                 Value fetch = vm.heap[ref.data.objectHandle].arr[n.data.intVal];
                 vm.opst.push_back(fetch);
+
+                cout << "Got heap value at index " << n.data.intVal << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::SET_INDEX:{
@@ -932,6 +1161,9 @@ int main (){
                 vm.opst.pop_back();
 
                 vm.heap[ref.data.objectHandle].arr[index.data.intVal] = value;
+
+                cout << "Set heap value at index " << index.data.intVal << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::GRTRTHAN:{
@@ -943,6 +1175,9 @@ int main (){
 
                 bool ret = left.data.intVal > right.data.intVal;
                 vm.opst.push_back(Value::Bool(ret));
+
+                cout << "Compared > and pushed boolean " << ret << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::GRTREQUAL:{
@@ -954,17 +1189,24 @@ int main (){
 
                 bool ret = left.data.intVal >= right.data.intVal;
                 vm.opst.push_back(Value::Bool(ret));
+
+                cout << "compared >= and pushed boolean " << ret << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::EQUAL:{
+                assert(vm.opst.size() > 1);
                 Value right = vm.opst.back();
                 vm.opst.pop_back();
 
                 Value left = vm.opst.back();
                 vm.opst.pop_back();
 
-                bool ret = left.data.intVal == right.data.intVal;
+                bool ret = (left.data.intVal == right.data.intVal);
                 vm.opst.push_back(Value::Bool(ret));
+
+                cout << "Compared == and pushed boolean " << ret << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::LESSTHAN:{
@@ -976,6 +1218,9 @@ int main (){
 
                 bool ret = left.data.intVal < right.data.intVal;
                 vm.opst.push_back(Value::Bool(ret));
+
+                cout << "Compared < and pushed boolean " << ret << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::LESSEQUAL:{
@@ -987,6 +1232,9 @@ int main (){
 
                 bool ret = left.data.intVal <= right.data.intVal;
                 vm.opst.push_back(Value::Bool(ret));
+
+                cout << "Compared <= and pushed boolean " << ret << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::NOTEQUAL:{
@@ -998,24 +1246,40 @@ int main (){
 
                 bool ret = left.data.intVal != right.data.intVal;
                 vm.opst.push_back(Value::Bool(ret));
+
+                cout << "Compared != and pushed boolean " <<  ret << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::GET_LOCAL: {
                 int n = vm.bc[++vm.ip];
                 vm.opst.push_back(vm.callst.back().locals[n]);
+
+                cout << "Pushed local @ " << n << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::SET_LOCAL:{
                 int n = vm.bc[++vm.ip];
-                int val = vm.opst.back().data.intVal;
-                vm.opst.pop_back();
-                vm.callst.back().locals[n] = Value::Int(val);
+                Value val = vm.opst.back();
+                //vm.opst.pop_back(); this line is incorrect and was a pretty frustrating bug; we already emit POP after SET_LOCAL, so the VM ends up popping twice-stack underflow
+                callFrame &frame = vm.callst.back();
+                
+                if (n >= frame.locals.size()) frame.locals.resize(n + 1);
+                vm.callst.back().locals[n] = val;
+
+                cout << "Set local" << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::NEG:{
+                assert(vm.opst.back().tag == ValueType::INT);
                 int v = vm.opst.back().data.intVal;
                 vm.opst.pop_back();
-                vm.opst.push_back(Value::Int(-1*v));
+                vm.opst.push_back(Value::Int(-v));
+
+                cout << "Negated and pushed integer" << -v << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::NOT:{
@@ -1023,6 +1287,9 @@ int main (){
                 bool v = vm.opst.back().data.boolVal;
                 vm.opst.pop_back();
                 vm.opst.push_back(Value::Bool(!v));
+
+                cout << "Boolean negated and pushed boolean " << !v << endl;
+                vm.ip++;
                 continue;
             }
             case Opcode::RET:{
@@ -1042,6 +1309,45 @@ int main (){
 
                 vm.callst.pop_back(); // call stack cleanup
                 vm.ip = retIP;
+
+                cout << "Returned to: " << retIP << endl;
+                continue;
+            }
+            case Opcode::PRINT: {
+                Value v = vm.opst.back();
+                vm.opst.pop_back();
+
+                switch (v.tag) {
+                    case ValueType::INT:
+                        cout << v.data.intVal << "\n";
+                        break;
+                    case ValueType::BOOL:
+                        cout << (v.data.boolVal ? "true" : "false") << "\n";
+                        break;
+                    case ValueType::NIL:
+                        cout << "nil\n";
+                        break;
+                    default:
+                        cout << "<object>\n";
+                }
+
+                vm.ip++;
+                continue;
+            }
+            case Opcode::JUMP_IF_FALSE: {
+                assert(vm.opst.size() > 0);
+                Value val = vm.opst.back();
+                vm.opst.pop_back();
+                assert(val.tag == ValueType::BOOL);
+
+                int n = vm.bc[++vm.ip];
+                if (!val.data.boolVal) vm.ip = n;
+                else vm.ip++;
+                continue;
+            }
+            case Opcode::JUMP: {
+                int n = vm.bc[++vm.ip];
+                vm.ip = n;
                 continue;
             }
             default:{
