@@ -140,17 +140,17 @@ I don't remember the date because I forgot to update this file when I completed 
 This phase is where the project started going from 'glorified switch statement which gobbles up hardcoded bytecode and calls it a good day's work' to 'lowkey a serious language runtime with which you can compile and execute a program'.
 
 The pipeline I decided on was:
- _______________________________
-|  Source Code                  |
-|     ↓                         |
-|  Lexer (characters → tokens)  |
-|     ↓                         |
-|  Parser (tokens → AST)        |
-|     ↓                         |
-|  Compiler (AST → bytecode)    |
-|     ↓                         |
-|  VM (bytecode → execution)    |
-|_______________________________|
+ &emsp &nbsp _______________________________
+<br>|&emsp Source Code &emsp |<br>
+<br>|     ↓                         |<br>
+<br>| &emsp Lexer (characters → tokens)  |<br>
+<br>|     ↓                         |<br>
+<br>| &emsp Parser (tokens → AST) &nbsp       |<br>
+<br>|     ↓                         |<br>
+<br>| &emsp Compiler (AST → bytecode)  &nbsp  |<br>
+<br>|     ↓                         |<br>
+<br>| &emsp VM (bytecode → execution)  &nbsp  |<br>
+<br> &emsp &nbsp |_______________________________|<br>
 (that box I made around the pipeline architecture took me longer than I expected to make it :/)
 
 This phase was pretty big, so it's best to split it into parts:
