@@ -139,8 +139,8 @@ I don't remember the date because I forgot to update this file when I completed 
 
 This phase is where the project started going from 'glorified switch statement which gobbles up hardcoded bytecode and calls it a good day's work' to 'lowkey a serious language runtime with which you can compile and execute a program'.
 
-The pipeline I decided on was:
- &emsp &nbsp _______________________________
+The pipeline I decided on was:<br><br>
+ &emsp; &nbsp; _______________________________
 <br>|&emsp Source Code &emsp |
 <br>|  &emsp &emsp   ↓   &emsp      &emsp     |
 <br>| &emsp Lexer (characters → tokens)  |
