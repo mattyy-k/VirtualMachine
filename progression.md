@@ -141,15 +141,15 @@ This phase is where the project started going from 'glorified switch statement w
 
 The pipeline I decided on was:<br><br>
  &emsp; &nbsp; _______________________________
-<br>|&emsp; Source Code &emsp; |
-<br>|  &emsp; &emsp; &emsp; &emsp;  ↓   &emsp;   &emsp;  &emsp; &emsp;   |
-<br>| &emsp; Lexer (characters → tokens)  |
-<br>|   &emsp; &emsp; &emsp; &emsp;  ↓    &emsp;    &emsp; &emsp; &emsp;           |
+<br>|&emsp; Source Code &emsp; &emsp;   &emsp;  &emsp; &emsp; |
+<br>|  &emsp; &emsp; &emsp; &emsp;  ↓   &emsp;   &emsp;  &emsp; &emsp; &emsp;   &emsp;  &emsp; &emsp;  |
+<br>| &emsp; Lexer (characters → tokens) &emsp;   &emsp;  &emsp; |
+<br>|   &emsp; &emsp; &emsp; &emsp;  ↓    &emsp;    &emsp; &emsp; &emsp;    &emsp;   &emsp;  &emsp; &emsp;       |
 <br>| &emsp; Parser (tokens → AST) &nbsp;  &nbsp     |
-<br>|   &emsp; &emsp; &emsp; &emsp;  ↓         &emsp; &emsp;    &emsp; &emsp;             |
-<br>| &emsp; Compiler (AST → bytecode)  &nbsp;  |
-<br>|  &emsp; &emsp; &emsp; &emsp;   ↓         &emsp; &emsp;   &emsp; &emsp;              |
-<br>| &emsp; VM (bytecode → execution)  &nbsp;  |
+<br>|   &emsp; &emsp; &emsp; &emsp;  ↓         &emsp; &emsp;    &emsp; &emsp;    &emsp;   &emsp;  &emsp; &emsp;         |
+<br>| &emsp; Compiler (AST → bytecode)  &nbsp; &emsp; |
+<br>|  &emsp; &emsp; &emsp; &emsp;   ↓         &emsp; &emsp;   &emsp; &emsp;      &emsp;   &emsp;  &emsp; &emsp;        |
+<br>| &emsp; VM (bytecode → execution)  &nbsp; &emsp; |
 <br> &emsp; &nbsp; _______________________________<br>
 (that box I made around the pipeline architecture took me longer than I expected to make it :/)
 
