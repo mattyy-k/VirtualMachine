@@ -140,17 +140,14 @@ I don't remember the date because I forgot to update this file when I completed 
 This phase is where the project started going from 'glorified switch statement which gobbles up hardcoded bytecode and calls it a good day's work' to 'lowkey a serious language runtime with which you can compile and execute a program'.
 
 The pipeline I decided on was:<br><br>
- &emsp; &nbsp; _______________________________
-<br>|&emsp; Source Code &emsp; &emsp;   &emsp;  &emsp; &emsp; |
-<br>|  &emsp; &emsp; &emsp; &emsp;  ↓   &emsp;   &emsp;  &emsp; &emsp; &emsp;   &emsp;  &emsp; &emsp;  |
-<br>| &emsp; Lexer (characters → tokens) &emsp;   &emsp;  &emsp; |
-<br>|   &emsp; &emsp; &emsp; &emsp;  ↓    &emsp;    &emsp; &emsp; &emsp;    &emsp;   &emsp;  &emsp; &emsp;       |
-<br>| &emsp; Parser (tokens → AST) &nbsp;  &nbsp     |
-<br>|   &emsp; &emsp; &emsp; &emsp;  ↓         &emsp; &emsp;    &emsp; &emsp;    &emsp;   &emsp;  &emsp; &emsp;         |
-<br>| &emsp; Compiler (AST → bytecode)  &nbsp; &emsp; |
-<br>|  &emsp; &emsp; &emsp; &emsp;   ↓         &emsp; &emsp;   &emsp; &emsp;      &emsp;   &emsp;  &emsp; &emsp;        |
-<br>| &emsp; VM (bytecode → execution)  &nbsp; &emsp; |
-<br> &emsp; &nbsp; _______________________________<br>
+graph TD
+    A[Source Code] --> B[Lexer <br/>characters to tokens]
+    B --> C[Parser <br/>tokens to AST]
+    C --> D[Compiler <br/>AST to bytecode]
+    D --> E[VM <br/>bytecode to execution]
+
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style E fill:#00ff0033,stroke:#333,stroke-width:2px
 (that box I made around the pipeline architecture took me longer than I expected to make it :/)
 
 This phase was pretty big, so it's best to split it into parts:
