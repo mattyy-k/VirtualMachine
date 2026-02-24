@@ -67,6 +67,7 @@ Systems chops!
 Also, how to function at 3 AM solely on caffeine fumes.
 
 ### Phase 0 (16/12/2025):
+```
 -Stack-based VM and not Register-based. Reason: fast enough, and much simpler to implement.
 
 -Execution model:
@@ -85,8 +86,9 @@ Also, how to function at 3 AM solely on caffeine fumes.
 -Memory Model:
   -Primitive values on the Vm stack; heap objects are referenced via pointers stored in Values.
 -Non-goals: No GC, closures, JIT, threads, native FFI, Optimizer, Exceptions, YET. Will be implemented in later phases.
-  
+```
 ### Phase 1 (10/01/2026):
+```
 -Enum class Opcode for all opcodes: PUSH, POP, ADD, SUB, MUL, DIV, MOD, HALT. Why enum class and not enum? Because enum allows a lot of shady, implicit shit, and allowing implicit shit in your VM is the best way to shoot yourself in the foot. (For those who are curious about what I mean by 'shady shit': I mean implicit conversions and accidental misuse, which is dangerous in a VM, where explicitness and correctness are critical)
 
 -Stack invariant followed as religiously as my daily call to my mom. :)
@@ -96,8 +98,9 @@ Also, how to function at 3 AM solely on caffeine fumes.
 -One bug I encountered that threw probably one of the longest error messages I've ever seen 💀: switch cases DO NOT create a new scope per case; the entire switch statement is one scope. If you don't care about what that means, just follow this: if you're declaring anything in your switch case, the switch case MUST be wrapped in {} brackets, especially if you're going to re-declare it in another case.<br>
 Another bug that had me blaming the compiler for a while was enum casting. And guess what? It was due to my decision to be the good guy and pick enum class over enum. It would not have occured, had I gone with enum instead of enum class (because implicit conversion). :/ Can't get a break in this economy 🙄
 
-
+```
 ### Phase 2 (10/01/2026):
+```
 -Added proper function calls via CALL/RET and a separate call stack. Each function invocation gets its own call frame containing a return IP and a frame base into the operand stack. Operand stack holds values only; call stack holds control state only. Mixing the two is how you get early dementia.
 
 -The key realization in this phase is this: A function call isn't wizardry. It's just dropping a 'brb I gotchu' bookmark and jumping. CALL saves where execution should resume and where the callee’s stack slice begins; RET restores both and nukes everything above the frame base. No magic, no hidden state, no 'function objects'.
@@ -107,8 +110,9 @@ Another bug that had me blaming the compiler for a while was enum casting. And g
 -Return values are handled explicitly: if the callee leaves a value on the stack, RET preserves it by popping it, cleaning the stack, and pushing it back. This also explains why stack cleanup is O(1): you’re not deleting values, you’re just rewinding the stack pointer.
 
 -This phase went much smoother than Phase 1. That does NOT bode well 💀. Feels like the calm before the shitstorm.
-
+```
 ### Phase 3 (12/01/2026):
+```
 Well... I wasn't wrong. That kinda was a shitstorm.
 
 -Stack vs heap clicked pretty early: stack is only for handles to objects, while heap is for objects.
@@ -118,8 +122,9 @@ Well... I wasn't wrong. That kinda was a shitstorm.
 -Ran into a couple of segfaults that had me screaming inside in the library (don't do this shit for more than 5 hours a day, kids 🙄). But segfaults were just undefined behaviour surfacing after invariants were violated. Can't even blame anything but my own saturated brain 😶‍🌫️.
 
 -I think this was the point I started feeling like I was building something solid.
-
+```
 ### Phase 4 (13/01/2026):
+```
 GC was... Less of a nightmare than I'd thought. Or maybe I just finally got some good sleep yesterday.
 
 -The main realisation in this stage was that the heap is a graph. Objects in the heap may point to other objects. For example, if the heap object is an array, some Value elements in it may be ValueType::OBJECT which point to another array, which in turn have elements that point to other objects, and so on. I hope that immediately smells like recursion to you, whoever's reading this. Therefore, **the mark phase is inherently recursive** (or graph-traversal based). Garbage collection is a DFS/BFS graph traversal.
@@ -134,7 +139,9 @@ Caveats:
 
 -Garbage collection runs every time the number of objects on the heap exceeds 50. But what if the program actually needs more than 50 objects? The VM will end up running GC for every allotment after the 50th allotment. GC is costly: O(heapsize) complexity. A better system will be implemented in later phases.
 
+```
 ### Phase 5 (I don't even remember the date bro not gonna lie)
+```
 I don't remember the date because I forgot to update this file when I completed that phase 💀. You can probably imagine, dear reader, how fucking DONE with this shit I was at that point. Well, anyway, I'm back now. I think.
 
 This phase is where the project started going from 'glorified switch statement which gobbles up hardcoded bytecode and calls it a good day's work' to 'lowkey a serious language runtime with which you can compile and execute a program'.
@@ -289,3 +296,5 @@ Because each stage removes one kind of complexity:
 
 <br><br>Each layer converts a complex problem into a simpler one for the next layer.
 Without this separation, every part of the system would need to understand everything else.<br><br>
+
+```
