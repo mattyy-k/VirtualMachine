@@ -88,7 +88,7 @@ Also, how to function at 3 AM solely on caffeine fumes.
 -Non-goals: No GC, closures, JIT, threads, native FFI, Optimizer, Exceptions, YET. Will be implemented in later phases.
 ```
 ### Phase 1 (10/01/2026):
-```
+
 -Enum class Opcode for all opcodes: PUSH, POP, ADD, SUB, MUL, DIV, MOD, HALT. Why enum class and not enum? Because enum allows a lot of shady, implicit shit, and allowing implicit shit in your VM is the best way to shoot yourself in the foot. (For those who are curious about what I mean by 'shady shit': I mean implicit conversions and accidental misuse, which is dangerous in a VM, where explicitness and correctness are critical)
 
 -Stack invariant followed as religiously as my daily call to my mom. :)
@@ -98,7 +98,7 @@ Also, how to function at 3 AM solely on caffeine fumes.
 -One bug I encountered that threw probably one of the longest error messages I've ever seen 💀: switch cases DO NOT create a new scope per case; the entire switch statement is one scope. If you don't care about what that means, just follow this: if you're declaring anything in your switch case, the switch case MUST be wrapped in {} brackets, especially if you're going to re-declare it in another case.<br>
 Another bug that had me blaming the compiler for a while was enum casting. And guess what? It was due to my decision to be the good guy and pick enum class over enum. It would not have occured, had I gone with enum instead of enum class (because implicit conversion). :/ Can't get a break in this economy 🙄
 
-```
+
 ### Phase 2 (10/01/2026):
 -Added proper function calls via CALL/RET and a separate call stack. Each function invocation gets its own call frame containing a return IP and a frame base into the operand stack. Operand stack holds values only; call stack holds control state only. Mixing the two is how you get early dementia.
 
